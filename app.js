@@ -57,14 +57,34 @@ function setupEventListeners() {
         editor.addEventListener('paste', handlePaste);
     }
 
-    // Mobile sidebar events
+    // Mobile sidebar events - use both click and touchend for iOS
     const menuBtn = $('menuBtn');
     const sidebarClose = $('sidebarClose');
     const sidebarOverlay = $('sidebarOverlay');
 
-    if (menuBtn) menuBtn.addEventListener('click', openSidebar);
-    if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
-    if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
+    if (menuBtn) {
+        menuBtn.addEventListener('click', openSidebar);
+        menuBtn.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            openSidebar();
+        }, { passive: false });
+    }
+
+    if (sidebarClose) {
+        sidebarClose.addEventListener('click', closeSidebar);
+        sidebarClose.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            closeSidebar();
+        }, { passive: false });
+    }
+
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', closeSidebar);
+        sidebarOverlay.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            closeSidebar();
+        }, { passive: false });
+    }
 
     // Search & Filter
     const searchInput = $('searchInput');
@@ -72,7 +92,7 @@ function setupEventListeners() {
     if (searchInput) searchInput.addEventListener('input', filterSnippets);
     if (categoryFilter) categoryFilter.addEventListener('change', filterSnippets);
 
-    // Action buttons
+    // Action buttons - add both click and touch events
     const openNewTabBtn = $('openNewTabBtn');
     const mobilePreviewBtn = $('mobilePreviewBtn');
     const exportBtn = $('exportBtn');
@@ -82,24 +102,37 @@ function setupEventListeners() {
     const saveFolderBtn = $('saveFolderBtn');
     const refreshPreview = $('refreshPreview');
 
-    if (openNewTabBtn) openNewTabBtn.addEventListener('click', openInNewTab);
-    if (mobilePreviewBtn) mobilePreviewBtn.addEventListener('click', openInNewTab);
-    if (exportBtn) exportBtn.addEventListener('click', exportSnippets);
-    if (importBtn) importBtn.addEventListener('click', () => importFile && importFile.click());
-    if (importFile) importFile.addEventListener('change', importSnippets);
-    if (downloadBtn) downloadBtn.addEventListener('click', downloadHTML);
-    if (saveFolderBtn) saveFolderBtn.addEventListener('click', saveToFolder);
-    if (refreshPreview) refreshPreview.addEventListener('click', updatePreview);
+    // Helper to add both click and touch events
+    function addTouchClick(el, handler) {
+        if (!el) return;
+        el.addEventListener('click', handler);
+        el.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            handler.call(this, e);
+        }, { passive: false });
+    }
 
-    // Mobile view toggle
+    if (openNewTabBtn) addTouchClick(openNewTabBtn, openInNewTab);
+    if (mobilePreviewBtn) addTouchClick(mobilePreviewBtn, openInNewTab);
+    if (exportBtn) addTouchClick(exportBtn, exportSnippets);
+    if (importBtn) addTouchClick(importBtn, () => importFile && importFile.click());
+    if (importFile) importFile.addEventListener('change', importSnippets);
+    if (downloadBtn) addTouchClick(downloadBtn, downloadHTML);
+    if (saveFolderBtn) addTouchClick(saveFolderBtn, saveToFolder);
+    if (refreshPreview) addTouchClick(refreshPreview, updatePreview);
+
+    // Mobile view toggle - handle both click and touch
     const mobileViewToggle = $('mobileViewToggle');
     if (mobileViewToggle) {
-        mobileViewToggle.addEventListener('click', (e) => {
+        const handleToggle = (e) => {
             const btn = e.target.closest('.toggle-btn');
             if (btn && btn.dataset.view) {
+                e.preventDefault();
                 setMobileView(btn.dataset.view);
             }
-        });
+        };
+        mobileViewToggle.addEventListener('click', handleToggle);
+        mobileViewToggle.addEventListener('touchend', handleToggle, { passive: false });
     }
 
     // Resizer
@@ -535,11 +568,12 @@ function renderSnippetsList() {
         </div>
     `).join('');
 
-    // Add click listeners
+    // Add click and touch listeners for snippet cards
     snippetsList.querySelectorAll('.snippet-card').forEach(card => {
-        card.addEventListener('click', (e) => {
+        const handleCardClick = (e) => {
             if (e.target.closest('[data-action="delete"]')) {
                 e.stopPropagation();
+                e.preventDefault();
                 deleteSnippet(e.target.closest('[data-action="delete"]').dataset.id);
             } else {
                 loadSnippet(card.dataset.id);
@@ -547,7 +581,9 @@ function renderSnippetsList() {
                     closeSidebar();
                 }
             }
-        });
+        };
+        card.addEventListener('click', handleCardClick);
+        card.addEventListener('touchend', handleCardClick, { passive: false });
     });
 }
 

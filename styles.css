@@ -64,6 +64,8 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    /* Fix for iOS touch events */
+    -webkit-tap-highlight-color: transparent;
 }
 
 html {
@@ -256,6 +258,7 @@ body {
 .search-input {
     width: 100%;
     padding: var(--space-sm) var(--space-md) var(--space-sm) 42px;
+    min-height: 44px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -263,6 +266,7 @@ body {
     font-family: var(--font-ui);
     font-size: 0.9rem;
     transition: all var(--transition-fast);
+    touch-action: manipulation;
 }
 
 .search-input:focus {
@@ -278,6 +282,7 @@ body {
 .filter-select {
     width: 100%;
     padding: var(--space-sm) var(--space-md);
+    min-height: 44px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -291,6 +296,7 @@ body {
     background-repeat: no-repeat;
     background-position: right 12px center;
     padding-right: 40px;
+    touch-action: manipulation;
 }
 
 .filter-select:focus {
@@ -385,6 +391,10 @@ body {
     transition: all var(--transition-fast);
     position: relative;
     overflow: hidden;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    /* Ensure minimum touch target */
+    min-height: 60px;
 }
 
 .snippet-card::before {
@@ -457,22 +467,36 @@ body {
 
 .snippet-card-actions {
     position: absolute;
-    top: var(--space-sm);
-    right: var(--space-sm);
+    top: var(--space-xs);
+    right: var(--space-xs);
     opacity: 0;
     transition: opacity var(--transition-fast);
+    /* Ensure touch works on mobile */
+    pointer-events: none;
 }
 
 .snippet-card:hover .snippet-card-actions,
 .snippet-card:active .snippet-card-actions {
     opacity: 1;
+    pointer-events: auto;
+}
+
+/* Always show actions on mobile for touch access */
+@media (max-width: 768px) {
+    .snippet-card-actions {
+        opacity: 1;
+        pointer-events: auto;
+    }
 }
 
 .snippet-card-actions .btn-icon {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     background: var(--bg-elevated);
     border: 1px solid var(--border-color);
+    touch-action: manipulation;
 }
 
 .snippet-card-actions .btn-icon:hover {
@@ -523,15 +547,20 @@ body {
     inset: 0;
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     z-index: 150;
     opacity: 0;
     visibility: hidden;
-    transition: all var(--transition-normal);
+    pointer-events: none;
+    transition: opacity var(--transition-normal), visibility var(--transition-normal);
+    /* Critical: Enable touch on overlay when active */
+    touch-action: manipulation;
 }
 
 .sidebar-overlay.active {
     opacity: 1;
     visibility: visible;
+    pointer-events: auto;
 }
 
 /* ========================================
@@ -773,6 +802,7 @@ body {
     justify-content: center;
     gap: var(--space-xs);
     padding: var(--space-sm) var(--space-lg);
+    min-height: 44px;
     background: transparent;
     border: none;
     border-radius: var(--radius-md);
@@ -782,6 +812,8 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast);
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
 }
 
 .toggle-btn.active {
@@ -799,6 +831,7 @@ body {
     justify-content: center;
     gap: var(--space-sm);
     padding: var(--space-sm) var(--space-lg);
+    min-height: 44px;
     font-family: var(--font-ui);
     font-size: 0.9rem;
     font-weight: 600;
@@ -809,6 +842,8 @@ body {
     white-space: nowrap;
     position: relative;
     overflow: hidden;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
 }
 
 .btn-primary {
@@ -867,8 +902,10 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     padding: 0;
     background: transparent;
     border: none;
@@ -876,6 +913,8 @@ body {
     color: var(--text-secondary);
     cursor: pointer;
     transition: all var(--transition-fast);
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
 }
 
 .btn-icon:hover {
@@ -1087,4 +1126,99 @@ body {
         min-height: 32px;
         padding: var(--space-xs) var(--space-sm);
     }
+}
+
+/* ========================================
+   Mobile Touch Fixes - CRITICAL
+======================================== */
+@media (max-width: 768px) {
+    /* Ensure all interactive elements have proper touch handling */
+    button,
+    .btn,
+    .btn-icon,
+    .toggle-btn,
+    .snippet-card,
+    input,
+    select,
+    textarea {
+        touch-action: manipulation;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    /* Allow text selection in editor */
+    .html-editor {
+        -webkit-user-select: text;
+        user-select: text;
+        touch-action: auto;
+    }
+
+    /* Fix z-index stacking context */
+    .mobile-header {
+        z-index: 1000;
+    }
+
+    .sidebar {
+        z-index: 1100;
+    }
+
+    .sidebar-overlay {
+        z-index: 1050;
+    }
+
+    .mobile-view-toggle {
+        z-index: 1000;
+    }
+
+    .toast-container {
+        z-index: 9999;
+    }
+
+    /* Ensure buttons are always clickable */
+    .btn-icon:active,
+    .btn:active,
+    .toggle-btn:active {
+        transform: scale(0.95);
+        opacity: 0.9;
+    }
+
+    /* Fix snippet card touch */
+    .snippet-card {
+        -webkit-tap-highlight-color: rgba(0, 255, 213, 0.2);
+    }
+
+    .snippet-card:active {
+        transform: scale(0.98);
+        background: var(--bg-hover);
+    }
+
+    /* Ensure mobile menu button is always clickable */
+    .menu-btn {
+        z-index: 1001;
+        position: relative;
+    }
+
+    /* Fix open button positioning */
+    .open-btn-mobile {
+        z-index: 1001;
+        position: relative;
+    }
+}
+
+/* Prevent ghost clicks on iOS */
+body {
+    -webkit-touch-callout: none;
+}
+
+/* Fix 300ms click delay on iOS */
+a, button, input, select, textarea {
+    touch-action: manipulation;
+}
+
+/* Ensure proper stacking for app container */
+.app-container {
+    position: relative;
+    z-index: 1;
+    isolation: isolate;
 }
