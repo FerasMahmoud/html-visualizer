@@ -1,6 +1,6 @@
 /**
  * HTML Visualizer - Application Logic
- * A single-page app for previewing, saving, and organizing HTML snippets
+ * Auto-save, mobile-friendly, one-click preview
  */
 
 // ========================================
@@ -9,9 +9,9 @@
 const state = {
     snippets: [],
     currentSnippetId: null,
-    isModified: false,
-    fileHandle: null, // For File System Access API
-    editorContent: ''
+    fileHandle: null,
+    autoSaveTimeout: null,
+    mobileView: 'split'
 };
 
 // ========================================
@@ -32,34 +32,31 @@ const elements = {
 
     // Sidebar
     sidebar: document.getElementById('sidebar'),
-    sidebarToggle: document.getElementById('sidebarToggle'),
+    sidebarOverlay: document.getElementById('sidebarOverlay'),
     searchInput: document.getElementById('searchInput'),
     categoryFilter: document.getElementById('categoryFilter'),
     snippetsList: document.getElementById('snippetsList'),
     snippetsCount: document.getElementById('snippetsCount'),
 
+    // Mobile
+    mobileHeader: document.getElementById('mobileHeader'),
+    menuBtn: document.getElementById('menuBtn'),
+    sidebarClose: document.getElementById('sidebarClose'),
+    mobileTitleText: document.getElementById('mobileTitleText'),
+    mobilePreviewBtn: document.getElementById('mobilePreviewBtn'),
+    mobileViewToggle: document.getElementById('mobileViewToggle'),
+    editorPanel: document.getElementById('editorPanel'),
+    previewPanel: document.getElementById('previewPanel'),
+    editorContainer: document.getElementById('editorContainer'),
+
     // Buttons
-    newSnippetBtn: document.getElementById('newSnippetBtn'),
-    saveBtn: document.getElementById('saveBtn'),
+    openNewTabBtn: document.getElementById('openNewTabBtn'),
     exportBtn: document.getElementById('exportBtn'),
     importBtn: document.getElementById('importBtn'),
     importFile: document.getElementById('importFile'),
-    copyBtn: document.getElementById('copyBtn'),
-    formatBtn: document.getElementById('formatBtn'),
     downloadBtn: document.getElementById('downloadBtn'),
     saveFolderBtn: document.getElementById('saveFolderBtn'),
     refreshPreview: document.getElementById('refreshPreview'),
-    openPreview: document.getElementById('openPreview'),
-
-    // Modal
-    saveModal: document.getElementById('saveModal'),
-    saveForm: document.getElementById('saveForm'),
-    closeSaveModal: document.getElementById('closeSaveModal'),
-    cancelSave: document.getElementById('cancelSave'),
-    snippetTitle: document.getElementById('snippetTitle'),
-    snippetDescription: document.getElementById('snippetDescription'),
-    snippetCategory: document.getElementById('snippetCategory'),
-    snippetTags: document.getElementById('snippetTags'),
 
     // Other
     resizer: document.getElementById('resizer'),
@@ -76,6 +73,11 @@ function init() {
     updatePreview();
     renderSnippetsList();
     setStatus('Ready');
+
+    // Check mobile and set initial view
+    if (window.innerWidth <= 768) {
+        setMobileView('editor');
+    }
 }
 
 // ========================================
@@ -89,29 +91,28 @@ function setupEventListeners() {
     elements.editor.addEventListener('paste', handlePaste);
 
     // Sidebar events
-    elements.sidebarToggle.addEventListener('click', toggleSidebar);
+    elements.menuBtn.addEventListener('click', openSidebar);
+    elements.sidebarClose.addEventListener('click', closeSidebar);
+    elements.sidebarOverlay.addEventListener('click', closeSidebar);
     elements.searchInput.addEventListener('input', filterSnippets);
     elements.categoryFilter.addEventListener('change', filterSnippets);
 
     // Action buttons
-    elements.newSnippetBtn.addEventListener('click', newSnippet);
-    elements.saveBtn.addEventListener('click', openSaveModal);
+    elements.openNewTabBtn.addEventListener('click', openInNewTab);
     elements.exportBtn.addEventListener('click', exportSnippets);
     elements.importBtn.addEventListener('click', () => elements.importFile.click());
     elements.importFile.addEventListener('change', importSnippets);
-    elements.copyBtn.addEventListener('click', copyToClipboard);
-    elements.formatBtn.addEventListener('click', formatHTML);
     elements.downloadBtn.addEventListener('click', downloadHTML);
     elements.saveFolderBtn.addEventListener('click', saveToFolder);
     elements.refreshPreview.addEventListener('click', updatePreview);
-    elements.openPreview.addEventListener('click', openPreviewInNewTab);
+    elements.mobilePreviewBtn.addEventListener('click', openInNewTab);
 
-    // Modal events
-    elements.closeSaveModal.addEventListener('click', closeSaveModal);
-    elements.cancelSave.addEventListener('click', closeSaveModal);
-    elements.saveForm.addEventListener('submit', handleSaveSnippet);
-    elements.saveModal.addEventListener('click', (e) => {
-        if (e.target === elements.saveModal) closeSaveModal();
+    // Mobile view toggle
+    elements.mobileViewToggle.addEventListener('click', (e) => {
+        const btn = e.target.closest('.toggle-btn');
+        if (btn) {
+            setMobileView(btn.dataset.view);
+        }
     });
 
     // Resizer
@@ -120,23 +121,69 @@ function setupEventListeners() {
     // Keyboard shortcuts
     document.addEventListener('keydown', handleGlobalKeydown);
 
-    // Title change
-    elements.currentTitle.addEventListener('input', () => {
-        state.isModified = true;
-        updateStatus();
+    // Handle visibility change - save when leaving
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden && elements.editor.value.trim()) {
+            autoSave();
+        }
     });
+
+    // Save before unload
+    window.addEventListener('beforeunload', () => {
+        if (elements.editor.value.trim()) {
+            autoSave();
+        }
+    });
+}
+
+// ========================================
+// Mobile View
+// ========================================
+function setMobileView(view) {
+    state.mobileView = view;
+
+    // Update toggle buttons
+    elements.mobileViewToggle.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.view === view);
+    });
+
+    // Show/hide panels
+    if (view === 'editor') {
+        elements.editorPanel.classList.remove('hidden');
+        elements.previewPanel.classList.add('hidden');
+    } else if (view === 'preview') {
+        elements.editorPanel.classList.add('hidden');
+        elements.previewPanel.classList.remove('hidden');
+    } else {
+        elements.editorPanel.classList.remove('hidden');
+        elements.previewPanel.classList.remove('hidden');
+    }
+}
+
+function openSidebar() {
+    elements.sidebar.classList.add('open');
+    elements.sidebarOverlay.classList.add('active');
+}
+
+function closeSidebar() {
+    elements.sidebar.classList.remove('open');
+    elements.sidebarOverlay.classList.remove('active');
 }
 
 // ========================================
 // Editor Functions
 // ========================================
 function handleEditorInput() {
-    state.editorContent = elements.editor.value;
-    state.isModified = true;
     updateLineNumbers();
     updatePreview();
     updateStats();
-    updateStatus();
+
+    // Extract title from HTML
+    const title = extractTitle(elements.editor.value);
+    updateTitle(title);
+
+    // Auto-save with debounce
+    scheduleAutoSave();
 }
 
 function handleEditorKeydown(e) {
@@ -151,25 +198,12 @@ function handleEditorKeydown(e) {
         elements.editor.selectionStart = elements.editor.selectionEnd = start + 2;
         handleEditorInput();
     }
-
-    // Ctrl/Cmd + S to save
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        openSaveModal();
-    }
-
-    // Ctrl/Cmd + Enter to update preview
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        updatePreview();
-    }
 }
 
-function handlePaste(e) {
-    // Allow paste and update after
+function handlePaste() {
     setTimeout(() => {
         handleEditorInput();
-        showToast('HTML pasted successfully', 'success');
+        showToast('Pasted & auto-saved', 'success');
     }, 0);
 }
 
@@ -184,12 +218,145 @@ function updateStats() {
     const lines = content.split('\n').length;
     const chars = content.length;
 
-    elements.lineCount.textContent = `${lines} lines`;
-    elements.charCount.textContent = `${chars.toLocaleString()} chars`;
+    elements.lineCount.textContent = `${lines}`;
+    elements.charCount.textContent = `${chars.toLocaleString()}`;
 }
 
 function syncScroll() {
     elements.lineNumbers.scrollTop = elements.editor.scrollTop;
+}
+
+// ========================================
+// Title Extraction
+// ========================================
+function extractTitle(html) {
+    if (!html || !html.trim()) return '';
+
+    // Try to find <title> tag
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (titleMatch && titleMatch[1].trim()) {
+        return titleMatch[1].trim();
+    }
+
+    // Try to find first heading
+    const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+    if (h1Match && h1Match[1].trim()) {
+        return h1Match[1].trim();
+    }
+
+    // Try to find id or class that suggests a component
+    const idMatch = html.match(/id=["']([^"']+)["']/i);
+    if (idMatch && idMatch[1].length < 30) {
+        return toTitleCase(idMatch[1].replace(/[-_]/g, ' '));
+    }
+
+    // Default to first 30 chars of content
+    const textContent = html.replace(/<[^>]*>/g, '').trim();
+    if (textContent) {
+        const firstLine = textContent.split('\n')[0].trim();
+        return firstLine.length > 30 ? firstLine.substring(0, 30) + '...' : firstLine;
+    }
+
+    return 'Untitled';
+}
+
+function toTitleCase(str) {
+    return str.replace(/\w\S*/g, txt =>
+        txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+    );
+}
+
+function updateTitle(title) {
+    elements.currentTitle.value = title;
+    elements.mobileTitleText.textContent = title || 'HTML Visualizer';
+    document.title = title ? `${title} - HTML Visualizer` : 'HTML Visualizer';
+}
+
+// ========================================
+// Auto-Save
+// ========================================
+function scheduleAutoSave() {
+    // Clear existing timeout
+    if (state.autoSaveTimeout) {
+        clearTimeout(state.autoSaveTimeout);
+    }
+
+    // Show saving indicator
+    elements.statusIndicator.classList.add('saving');
+    elements.statusText.textContent = 'Saving...';
+
+    // Save after 1 second of inactivity
+    state.autoSaveTimeout = setTimeout(() => {
+        autoSave();
+    }, 1000);
+}
+
+function autoSave() {
+    const html = elements.editor.value.trim();
+    if (!html) return;
+
+    const title = elements.currentTitle.value || 'Untitled';
+    const category = detectCategory(html);
+
+    // Check if this is an update to existing snippet or new
+    let snippet;
+    const now = new Date().toISOString();
+
+    if (state.currentSnippetId) {
+        // Update existing
+        const index = state.snippets.findIndex(s => s.id === state.currentSnippetId);
+        if (index !== -1) {
+            snippet = state.snippets[index];
+            snippet.title = title;
+            snippet.html = html;
+            snippet.category = category;
+            snippet.updatedAt = now;
+        }
+    }
+
+    if (!snippet) {
+        // Create new
+        snippet = {
+            id: generateId(),
+            title,
+            html,
+            category,
+            createdAt: now,
+            updatedAt: now
+        };
+        state.snippets.unshift(snippet);
+        state.currentSnippetId = snippet.id;
+    }
+
+    saveSnippetsToStorage();
+    renderSnippetsList();
+
+    // Update status
+    elements.statusIndicator.classList.remove('saving');
+    elements.statusText.textContent = 'Saved';
+    setStatus('Auto-saved');
+}
+
+function detectCategory(html) {
+    const lowerHtml = html.toLowerCase();
+
+    if (lowerHtml.includes('<form') || lowerHtml.includes('input') || lowerHtml.includes('button')) {
+        return 'form';
+    }
+    if (lowerHtml.includes('@keyframes') || lowerHtml.includes('animation') || lowerHtml.includes('transition')) {
+        return 'animation';
+    }
+    if (lowerHtml.includes('canvas') || lowerHtml.includes('game') || lowerHtml.includes('score')) {
+        return 'game';
+    }
+    if (lowerHtml.includes('grid') || lowerHtml.includes('flex') || lowerHtml.includes('layout')) {
+        return 'layout';
+    }
+    if (lowerHtml.includes('class=') && (lowerHtml.includes('card') || lowerHtml.includes('modal') || lowerHtml.includes('nav'))) {
+        return 'component';
+    }
+
+    return 'other';
 }
 
 // ========================================
@@ -198,65 +365,51 @@ function syncScroll() {
 function updatePreview() {
     const html = elements.editor.value;
 
-    // Create a safe preview with base styles
-    const previewHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                * { box-sizing: border-box; }
-                body { margin: 0; font-family: system-ui, sans-serif; }
-            </style>
-        </head>
-        <body>
-            ${html}
-        </body>
-        </html>
-    `;
+    const previewHTML = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>* { box-sizing: border-box; } body { margin: 0; font-family: system-ui, sans-serif; }</style>
+</head>
+<body>${html}</body>
+</html>`;
 
     const blob = new Blob([previewHTML], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
 
-    // Revoke previous URL to prevent memory leaks
     if (elements.previewFrame.dataset.blobUrl) {
         URL.revokeObjectURL(elements.previewFrame.dataset.blobUrl);
     }
 
     elements.previewFrame.src = url;
     elements.previewFrame.dataset.blobUrl = url;
-
-    setStatus('Preview updated');
 }
 
-function openPreviewInNewTab() {
+function openInNewTab() {
     const html = elements.editor.value;
-    const previewHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>${elements.currentTitle.value || 'Preview'}</title>
-            <style>
-                * { box-sizing: border-box; }
-                body { margin: 0; font-family: system-ui, sans-serif; }
-            </style>
-        </head>
-        <body>
-            ${html}
-        </body>
-        </html>
-    `;
+    const title = elements.currentTitle.value || 'Preview';
 
-    const blob = new Blob([previewHTML], { type: 'text/html' });
+    const fullHTML = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHtml(title)}</title>
+    <style>* { box-sizing: border-box; } body { margin: 0; font-family: system-ui, sans-serif; }</style>
+</head>
+<body>${html}</body>
+</html>`;
+
+    const blob = new Blob([fullHTML], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
+
+    showToast('Opened in new tab', 'success');
 }
 
 // ========================================
-// Snippet Management (localStorage)
+// Snippet Management
 // ========================================
 function loadSnippets() {
     try {
@@ -273,87 +426,12 @@ function saveSnippetsToStorage() {
         localStorage.setItem('htmlSnippets', JSON.stringify(state.snippets));
     } catch (e) {
         console.error('Error saving snippets:', e);
-        showToast('Failed to save to localStorage', 'error');
+        showToast('Storage full - clear old snippets', 'error');
     }
 }
 
 function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
-}
-
-// ========================================
-// Modal Functions
-// ========================================
-function openSaveModal() {
-    // Pre-fill with current title if editing
-    if (state.currentSnippetId) {
-        const snippet = state.snippets.find(s => s.id === state.currentSnippetId);
-        if (snippet) {
-            elements.snippetTitle.value = snippet.title;
-            elements.snippetDescription.value = snippet.description || '';
-            elements.snippetCategory.value = snippet.category || 'other';
-            elements.snippetTags.value = (snippet.tags || []).join(', ');
-        }
-    } else {
-        elements.snippetTitle.value = elements.currentTitle.value || '';
-        elements.snippetDescription.value = '';
-        elements.snippetCategory.value = 'other';
-        elements.snippetTags.value = '';
-    }
-
-    elements.saveModal.classList.add('active');
-    elements.snippetTitle.focus();
-}
-
-function closeSaveModal() {
-    elements.saveModal.classList.remove('active');
-    elements.saveForm.reset();
-}
-
-function handleSaveSnippet(e) {
-    e.preventDefault();
-
-    const title = elements.snippetTitle.value.trim() || 'Untitled';
-    const description = elements.snippetDescription.value.trim();
-    const category = elements.snippetCategory.value;
-    const tagsInput = elements.snippetTags.value;
-    const tags = tagsInput
-        .split(',')
-        .map(t => t.trim().toLowerCase())
-        .filter(t => t);
-
-    const snippetData = {
-        title,
-        description,
-        category,
-        tags,
-        html: elements.editor.value,
-        updatedAt: new Date().toISOString()
-    };
-
-    if (state.currentSnippetId) {
-        // Update existing snippet
-        const index = state.snippets.findIndex(s => s.id === state.currentSnippetId);
-        if (index !== -1) {
-            snippetData.id = state.currentSnippetId;
-            snippetData.createdAt = state.snippets[index].createdAt;
-            state.snippets[index] = snippetData;
-        }
-    } else {
-        // Create new snippet
-        snippetData.id = generateId();
-        snippetData.createdAt = new Date().toISOString();
-        state.snippets.unshift(snippetData);
-        state.currentSnippetId = snippetData.id;
-    }
-
-    saveSnippetsToStorage();
-    renderSnippetsList();
-    elements.currentTitle.value = title;
-    state.isModified = false;
-    updateStatus();
-    closeSaveModal();
-    showToast('Snippet saved successfully', 'success');
 }
 
 // ========================================
@@ -365,24 +443,19 @@ function renderSnippetsList() {
 
     let filtered = state.snippets;
 
-    // Apply search filter
     if (searchTerm) {
         filtered = filtered.filter(s =>
             s.title.toLowerCase().includes(searchTerm) ||
-            (s.description || '').toLowerCase().includes(searchTerm) ||
-            (s.tags || []).some(t => t.includes(searchTerm))
+            (s.html || '').toLowerCase().includes(searchTerm)
         );
     }
 
-    // Apply category filter
     if (categoryFilter) {
         filtered = filtered.filter(s => s.category === categoryFilter);
     }
 
-    // Update count
     elements.snippetsCount.textContent = `${filtered.length} snippet${filtered.length !== 1 ? 's' : ''}`;
 
-    // Render list
     if (filtered.length === 0) {
         elements.snippetsList.innerHTML = `
             <div class="empty-state">
@@ -390,16 +463,15 @@ function renderSnippetsList() {
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                     <polyline points="14 2 14 8 20 8"/>
                 </svg>
-                <p>${searchTerm || categoryFilter ? 'No matching snippets' : 'No snippets yet'}</p>
-                <span>${searchTerm || categoryFilter ? 'Try different search terms' : 'Paste HTML and save to get started'}</span>
+                <p>${searchTerm || categoryFilter ? 'No matches' : 'No snippets yet'}</p>
+                <span>${searchTerm || categoryFilter ? 'Try different search' : 'Paste HTML to auto-save'}</span>
             </div>
         `;
         return;
     }
 
     elements.snippetsList.innerHTML = filtered.map(snippet => `
-        <div class="snippet-card ${snippet.id === state.currentSnippetId ? 'active' : ''}"
-             data-id="${snippet.id}">
+        <div class="snippet-card ${snippet.id === state.currentSnippetId ? 'active' : ''}" data-id="${snippet.id}">
             <div class="snippet-card-actions">
                 <button class="btn-icon btn-delete" title="Delete" data-action="delete" data-id="${snippet.id}">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -408,30 +480,23 @@ function renderSnippetsList() {
                     </svg>
                 </button>
             </div>
-            <div class="snippet-card-title">
-                ${escapeHtml(snippet.title)}
-            </div>
-            ${snippet.description ? `<div class="snippet-card-description">${escapeHtml(snippet.description)}</div>` : ''}
+            <div class="snippet-card-title">${escapeHtml(snippet.title)}</div>
             <div class="snippet-card-meta">
                 <span class="snippet-card-category">${snippet.category || 'other'}</span>
                 <span class="snippet-card-date">${formatDate(snippet.updatedAt)}</span>
             </div>
-            ${snippet.tags && snippet.tags.length > 0 ? `
-                <div class="snippet-card-tags">
-                    ${snippet.tags.slice(0, 3).map(tag => `<span class="snippet-tag">${escapeHtml(tag)}</span>`).join('')}
-                    ${snippet.tags.length > 3 ? `<span class="snippet-tag">+${snippet.tags.length - 3}</span>` : ''}
-                </div>
-            ` : ''}
         </div>
     `).join('');
 
-    // Add click listeners to snippet cards
     elements.snippetsList.querySelectorAll('.snippet-card').forEach(card => {
         card.addEventListener('click', (e) => {
             if (e.target.closest('[data-action="delete"]')) {
                 deleteSnippet(e.target.closest('[data-action="delete"]').dataset.id);
             } else {
                 loadSnippet(card.dataset.id);
+                if (window.innerWidth <= 768) {
+                    closeSidebar();
+                }
             }
         });
     });
@@ -442,17 +507,14 @@ function loadSnippet(id) {
     if (!snippet) return;
 
     state.currentSnippetId = id;
-    state.editorContent = snippet.html;
     elements.editor.value = snippet.html;
-    elements.currentTitle.value = snippet.title;
-    state.isModified = false;
 
+    updateTitle(snippet.title);
     updateLineNumbers();
     updatePreview();
     updateStats();
-    updateStatus();
     renderSnippetsList();
-    setStatus(`Loaded: ${snippet.title}`);
+    setStatus('Loaded');
 }
 
 function deleteSnippet(id) {
@@ -460,41 +522,25 @@ function deleteSnippet(id) {
 
     state.snippets = state.snippets.filter(s => s.id !== id);
 
-    // If deleted current snippet, clear editor
     if (state.currentSnippetId === id) {
         state.currentSnippetId = null;
         elements.editor.value = '';
-        elements.currentTitle.value = 'Untitled Snippet';
+        updateTitle('');
         updateLineNumbers();
         updatePreview();
     }
 
     saveSnippetsToStorage();
     renderSnippetsList();
-    showToast('Snippet deleted', 'success');
+    showToast('Deleted', 'success');
 }
 
 function filterSnippets() {
     renderSnippetsList();
 }
 
-function newSnippet() {
-    state.currentSnippetId = null;
-    state.editorContent = '';
-    elements.editor.value = '';
-    elements.currentTitle.value = 'Untitled Snippet';
-    state.isModified = false;
-
-    updateLineNumbers();
-    updatePreview();
-    updateStats();
-    updateStatus();
-    renderSnippetsList();
-    setStatus('New snippet');
-}
-
 // ========================================
-// Import/Export Functions
+// Import/Export
 // ========================================
 function exportSnippets() {
     if (state.snippets.length === 0) {
@@ -530,14 +576,12 @@ function importSnippets(e) {
             const data = JSON.parse(event.target.result);
 
             if (!data.snippets || !Array.isArray(data.snippets)) {
-                throw new Error('Invalid file format');
+                throw new Error('Invalid format');
             }
 
-            // Add imported snippets
             const importedCount = data.snippets.length;
             data.snippets.forEach(snippet => {
-                snippet.id = generateId(); // Generate new IDs to avoid conflicts
-                snippet.importedAt = new Date().toISOString();
+                snippet.id = generateId();
             });
 
             state.snippets = [...data.snippets, ...state.snippets];
@@ -546,49 +590,40 @@ function importSnippets(e) {
 
             showToast(`Imported ${importedCount} snippets`, 'success');
         } catch (err) {
-            console.error('Import error:', err);
-            showToast('Failed to import: Invalid file format', 'error');
+            showToast('Invalid file format', 'error');
         }
     };
     reader.readAsText(file);
-
-    // Reset file input
     e.target.value = '';
 }
 
 // ========================================
-// File System Access API (Local Folder Save)
+// File System Access API
 // ========================================
 async function saveToFolder() {
     const html = elements.editor.value;
     const title = elements.currentTitle.value || 'snippet';
 
-    // Check if File System Access API is supported
     if (!('showSaveFilePicker' in window)) {
-        // Fallback to download
         downloadHTML();
         return;
     }
 
     try {
-        // Generate filename from title
         const filename = title.toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-|-$/g, '') + '.html';
 
-        const options = {
+        const handle = await window.showSaveFilePicker({
             suggestedName: filename,
             types: [{
                 description: 'HTML Files',
                 accept: { 'text/html': ['.html'] }
             }]
-        };
+        });
 
-        // Show save file picker
-        const handle = await window.showSaveFilePicker(options);
         const writable = await handle.createWritable();
 
-        // Write the HTML content
         const fullHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -604,32 +639,13 @@ ${html}
         await writable.write(fullHTML);
         await writable.close();
 
-        // Store handle for future saves
         state.fileHandle = handle;
-
-        showToast(`Saved to: ${handle.name}`, 'success');
-        setStatus('Saved to local file');
+        showToast(`Saved: ${handle.name}`, 'success');
     } catch (err) {
         if (err.name !== 'AbortError') {
-            console.error('Save error:', err);
-            showToast('Failed to save file', 'error');
+            showToast('Failed to save', 'error');
         }
     }
-}
-
-// ========================================
-// Utility Functions
-// ========================================
-function copyToClipboard() {
-    const html = elements.editor.value;
-    if (!html) {
-        showToast('Nothing to copy', 'warning');
-        return;
-    }
-
-    navigator.clipboard.writeText(html)
-        .then(() => showToast('Copied to clipboard', 'success'))
-        .catch(() => showToast('Failed to copy', 'error'));
 }
 
 function downloadHTML() {
@@ -663,61 +679,13 @@ ${html}
     showToast(`Downloaded: ${filename}`, 'success');
 }
 
-function formatHTML() {
-    let html = elements.editor.value;
-
-    // Simple HTML formatting (basic indentation)
-    // For production, consider using a proper formatter like prettier
-    try {
-        html = html
-            // Add newlines after >
-            .replace(/>/g, '>\n')
-            // Add newlines before <
-            .replace(/</g, '\n<')
-            // Remove multiple newlines
-            .replace(/\n\s*\n/g, '\n')
-            // Trim
-            .trim();
-
-        // Apply indentation
-        const lines = html.split('\n');
-        let indent = 0;
-        const formatted = lines.map(line => {
-            line = line.trim();
-            if (!line) return '';
-
-            // Decrease indent for closing tags
-            if (line.match(/^<\/\w/)) {
-                indent = Math.max(0, indent - 1);
-            }
-
-            const result = '  '.repeat(indent) + line;
-
-            // Increase indent after opening tags (except self-closing)
-            if (line.match(/^<\w[^>]*[^\/]>$/)) {
-                indent++;
-            }
-
-            return result;
-        });
-
-        elements.editor.value = formatted.join('\n');
-        handleEditorInput();
-        showToast('HTML formatted', 'success');
-    } catch (err) {
-        console.error('Format error:', err);
-        showToast('Failed to format HTML', 'error');
-    }
-}
-
-function toggleSidebar() {
-    elements.sidebar.classList.toggle('collapsed');
-}
-
+// ========================================
+// Utility Functions
+// ========================================
 function setupResizer() {
     let isResizing = false;
-    const editorPanel = document.querySelector('.editor-panel');
-    const previewPanel = document.querySelector('.preview-panel');
+    const editorPanel = elements.editorPanel;
+    const previewPanel = elements.previewPanel;
 
     elements.resizer.addEventListener('mousedown', (e) => {
         isResizing = true;
@@ -729,11 +697,8 @@ function setupResizer() {
     document.addEventListener('mousemove', (e) => {
         if (!isResizing) return;
 
-        const container = document.querySelector('.editor-container');
-        const containerRect = container.getBoundingClientRect();
+        const containerRect = elements.editorContainer.getBoundingClientRect();
         const percentage = ((e.clientX - containerRect.left) / containerRect.width) * 100;
-
-        // Limit between 20% and 80%
         const clampedPercentage = Math.max(20, Math.min(80, percentage));
 
         editorPanel.style.flex = `0 0 ${clampedPercentage}%`;
@@ -751,38 +716,21 @@ function setupResizer() {
 }
 
 function handleGlobalKeydown(e) {
-    // Ctrl/Cmd + B to toggle sidebar
     if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
         e.preventDefault();
-        toggleSidebar();
-    }
-
-    // Escape to close modal
-    if (e.key === 'Escape' && elements.saveModal.classList.contains('active')) {
-        closeSaveModal();
+        if (window.innerWidth <= 768) {
+            elements.sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+        }
     }
 }
 
-// ========================================
-// Status & Toast Functions
-// ========================================
 function setStatus(text) {
     elements.statusText.textContent = text;
     setTimeout(() => {
         if (elements.statusText.textContent === text) {
             elements.statusText.textContent = 'Ready';
         }
-    }, 3000);
-}
-
-function updateStatus() {
-    if (state.isModified) {
-        elements.statusIndicator.classList.add('modified');
-        elements.statusText.textContent = 'Modified';
-    } else {
-        elements.statusIndicator.classList.remove('modified');
-        elements.statusText.textContent = 'Saved';
-    }
+    }, 2000);
 }
 
 function showToast(message, type = 'info') {
@@ -803,12 +751,9 @@ function showToast(message, type = 'info') {
         toast.style.opacity = '0';
         toast.style.transform = 'translateX(100%)';
         setTimeout(() => toast.remove(), 300);
-    }, 3000);
+    }, 2000);
 }
 
-// ========================================
-// Helper Functions
-// ========================================
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -820,19 +765,11 @@ function formatDate(dateString) {
     const now = new Date();
     const diff = now - date;
 
-    // Less than 1 minute
     if (diff < 60000) return 'just now';
-
-    // Less than 1 hour
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-
-    // Less than 24 hours
     if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-
-    // Less than 7 days
     if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
 
-    // Otherwise show date
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
