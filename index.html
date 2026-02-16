@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0a0a0b">
     <meta name="description" content="HTML Visualizer - Preview, save, and organize your HTML snippets">
     <title>HTML Visualizer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,9 +15,15 @@
 </head>
 <body>
     <div class="app-container">
+        <!-- Background Effects -->
+        <div class="bg-effects">
+            <div class="bg-gradient"></div>
+            <div class="bg-grid"></div>
+        </div>
+
         <!-- Mobile Header -->
         <header class="mobile-header" id="mobileHeader">
-            <button class="btn-icon" id="menuBtn" aria-label="Menu">
+            <button class="btn-icon menu-btn" id="menuBtn" aria-label="Open menu" type="button">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M3 12h18M3 6h18M3 18h18"/>
                 </svg>
@@ -25,7 +32,7 @@
                 <span class="logo-icon">&lt;/&gt;</span>
                 <span id="mobileTitleText">HTML Visualizer</span>
             </h1>
-            <button class="btn-icon" id="mobilePreviewBtn" aria-label="Preview">
+            <button class="btn-icon open-btn-mobile" id="mobilePreviewBtn" aria-label="Open in new tab" type="button">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                     <polyline points="15 3 21 3 21 9"/>
@@ -34,6 +41,9 @@
             </button>
         </header>
 
+        <!-- Sidebar Overlay (mobile only) -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
@@ -41,7 +51,7 @@
                     <span class="logo-icon">&lt;/&gt;</span>
                     <span class="logo-text">HTML Visualizer</span>
                 </h1>
-                <button class="btn-icon sidebar-close" id="sidebarClose" aria-label="Close sidebar">
+                <button class="btn-icon sidebar-close" id="sidebarClose" aria-label="Close sidebar" type="button">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"/>
                         <line x1="6" y1="6" x2="18" y2="18"/>
@@ -71,7 +81,7 @@
             <!-- Actions -->
             <div class="sidebar-actions">
                 <div class="action-row">
-                    <button class="btn btn-secondary btn-small flex-1" id="exportBtn" title="Export all snippets">
+                    <button class="btn btn-secondary btn-small flex-1" id="exportBtn" title="Export snippets" type="button">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
@@ -79,7 +89,7 @@
                         </svg>
                         Export
                     </button>
-                    <button class="btn btn-secondary btn-small flex-1" id="importBtn" title="Import snippets">
+                    <button class="btn btn-secondary btn-small flex-1" id="importBtn" title="Import snippets" type="button">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="17 8 12 3 7 8"/>
@@ -95,40 +105,43 @@
             <div class="snippets-section">
                 <div class="snippets-header">
                     <span class="snippets-count" id="snippetsCount">0 snippets</span>
-                    <span class="auto-save-indicator" id="autoSaveIndicator">
+                    <span class="auto-save-indicator">
                         <span class="auto-save-dot"></span>
-                        Auto-save
+                        Auto-save ON
                     </span>
                 </div>
                 <div class="snippets-list" id="snippetsList">
                     <div class="empty-state" id="emptyState">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/>
-                        </svg>
-                        <p>No snippets yet</p>
-                        <span>Paste HTML to auto-save</span>
+                        <div class="empty-icon">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <path d="M12 18v-6"/>
+                                <path d="M9 15l3-3 3 3"/>
+                            </svg>
+                        </div>
+                        <h3>No snippets yet</h3>
+                        <p>Paste HTML code to get started</p>
                     </div>
                 </div>
             </div>
         </aside>
-
-        <!-- Sidebar Overlay (mobile) -->
-        <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
         <!-- Main Content -->
         <main class="main-content">
             <!-- Toolbar -->
             <div class="toolbar">
                 <div class="toolbar-left">
-                    <input type="text" id="currentTitle" class="title-input" placeholder="Untitled" value="" readonly>
+                    <div class="title-display">
+                        <span class="title-label" id="currentTitle">Untitled</span>
+                    </div>
                     <span class="status-indicator" id="statusIndicator">
                         <span class="status-dot"></span>
                         <span class="status-text">Ready</span>
                     </span>
                 </div>
                 <div class="toolbar-right">
-                    <button class="btn btn-primary" id="openNewTabBtn" title="Open in new tab">
+                    <button class="btn btn-primary btn-glow" id="openNewTabBtn" title="Open in new tab" type="button">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                             <polyline points="15 3 21 3 21 9"/>
@@ -136,14 +149,14 @@
                         </svg>
                         <span>Open</span>
                     </button>
-                    <button class="btn btn-ghost" id="downloadBtn" title="Download HTML">
+                    <button class="btn btn-ghost" id="downloadBtn" title="Download HTML" type="button">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
                             <line x1="12" y1="15" x2="12" y2="3"/>
                         </svg>
                     </button>
-                    <button class="btn btn-ghost" id="saveFolderBtn" title="Save to folder">
+                    <button class="btn btn-ghost" id="saveFolderBtn" title="Save to folder" type="button">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
@@ -163,13 +176,19 @@
                             Editor
                         </span>
                         <div class="editor-stats">
-                            <span id="lineCount">0</span>
-                            <span id="charCount">0</span>
+                            <span id="lineCount">0 lines</span>
+                            <span class="divider">|</span>
+                            <span id="charCount">0 chars</span>
                         </div>
                     </div>
                     <div class="editor-wrapper">
-                        <div class="line-numbers" id="lineNumbers"></div>
-                        <textarea id="htmlEditor" class="html-editor" placeholder="Paste your HTML code here..." spellcheck="false"></textarea>
+                        <div class="line-numbers" id="lineNumbers"><span>1</span></div>
+                        <textarea id="htmlEditor" class="html-editor" placeholder="Paste your HTML code here...
+
+Tips:
+• Code auto-saves as you type
+• Title extracted from <title> tag
+• Click 'Open' to preview in new tab" spellcheck="false"></textarea>
                     </div>
                 </div>
 
@@ -183,10 +202,10 @@
                                 <line x1="2" y1="12" x2="22" y2="12"/>
                                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                             </svg>
-                            Preview
+                            Live Preview
                         </span>
                         <div class="preview-actions">
-                            <button class="btn-icon" id="refreshPreview" title="Refresh">
+                            <button class="btn-icon" id="refreshPreview" title="Refresh preview" type="button">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
                                 </svg>
@@ -201,20 +220,20 @@
 
             <!-- Mobile View Toggle -->
             <div class="mobile-view-toggle" id="mobileViewToggle">
-                <button class="toggle-btn active" data-view="editor">
+                <button class="toggle-btn active" data-view="editor" type="button">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="16 18 22 12 16 6"/>
                         <polyline points="8 6 2 12 8 18"/>
                     </svg>
                     Code
                 </button>
-                <button class="toggle-btn" data-view="preview">
+                <button class="toggle-btn" data-view="preview" type="button">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/>
                     </svg>
                     Preview
                 </button>
-                <button class="toggle-btn" data-view="split">
+                <button class="toggle-btn" data-view="split" type="button">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="3" width="18" height="18" rx="2"/>
                         <line x1="12" y1="3" x2="12" y2="21"/>

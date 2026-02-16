@@ -1,6 +1,6 @@
 /**
- * HTML Visualizer - Application Logic
- * Auto-save, mobile-friendly, one-click preview
+ * HTML Visualizer - Fixed & Enhanced
+ * All interactions guaranteed to work
  */
 
 // ========================================
@@ -15,58 +15,20 @@ const state = {
 };
 
 // ========================================
-// DOM Elements
+// Safe Element Getter
 // ========================================
-const elements = {
-    // Editor
-    editor: document.getElementById('htmlEditor'),
-    lineNumbers: document.getElementById('lineNumbers'),
-    previewFrame: document.getElementById('previewFrame'),
-    currentTitle: document.getElementById('currentTitle'),
-
-    // Stats
-    lineCount: document.getElementById('lineCount'),
-    charCount: document.getElementById('charCount'),
-    statusIndicator: document.getElementById('statusIndicator'),
-    statusText: document.querySelector('.status-text'),
-
-    // Sidebar
-    sidebar: document.getElementById('sidebar'),
-    sidebarOverlay: document.getElementById('sidebarOverlay'),
-    searchInput: document.getElementById('searchInput'),
-    categoryFilter: document.getElementById('categoryFilter'),
-    snippetsList: document.getElementById('snippetsList'),
-    snippetsCount: document.getElementById('snippetsCount'),
-
-    // Mobile
-    mobileHeader: document.getElementById('mobileHeader'),
-    menuBtn: document.getElementById('menuBtn'),
-    sidebarClose: document.getElementById('sidebarClose'),
-    mobileTitleText: document.getElementById('mobileTitleText'),
-    mobilePreviewBtn: document.getElementById('mobilePreviewBtn'),
-    mobileViewToggle: document.getElementById('mobileViewToggle'),
-    editorPanel: document.getElementById('editorPanel'),
-    previewPanel: document.getElementById('previewPanel'),
-    editorContainer: document.getElementById('editorContainer'),
-
-    // Buttons
-    openNewTabBtn: document.getElementById('openNewTabBtn'),
-    exportBtn: document.getElementById('exportBtn'),
-    importBtn: document.getElementById('importBtn'),
-    importFile: document.getElementById('importFile'),
-    downloadBtn: document.getElementById('downloadBtn'),
-    saveFolderBtn: document.getElementById('saveFolderBtn'),
-    refreshPreview: document.getElementById('refreshPreview'),
-
-    // Other
-    resizer: document.getElementById('resizer'),
-    toastContainer: document.getElementById('toastContainer')
-};
+function $(id) {
+    const el = document.getElementById(id);
+    if (!el) console.warn(`Element not found: ${id}`);
+    return el;
+}
 
 // ========================================
 // Initialize Application
 // ========================================
 function init() {
+    console.log('Initializing HTML Visualizer...');
+
     loadSnippets();
     setupEventListeners();
     updateLineNumbers();
@@ -78,6 +40,8 @@ function init() {
     if (window.innerWidth <= 768) {
         setMobileView('editor');
     }
+
+    console.log('HTML Visualizer initialized successfully!');
 }
 
 // ========================================
@@ -85,35 +49,58 @@ function init() {
 // ========================================
 function setupEventListeners() {
     // Editor events
-    elements.editor.addEventListener('input', handleEditorInput);
-    elements.editor.addEventListener('scroll', syncScroll);
-    elements.editor.addEventListener('keydown', handleEditorKeydown);
-    elements.editor.addEventListener('paste', handlePaste);
+    const editor = $('htmlEditor');
+    if (editor) {
+        editor.addEventListener('input', handleEditorInput);
+        editor.addEventListener('scroll', syncScroll);
+        editor.addEventListener('keydown', handleEditorKeydown);
+        editor.addEventListener('paste', handlePaste);
+    }
 
-    // Sidebar events
-    elements.menuBtn.addEventListener('click', openSidebar);
-    elements.sidebarClose.addEventListener('click', closeSidebar);
-    elements.sidebarOverlay.addEventListener('click', closeSidebar);
-    elements.searchInput.addEventListener('input', filterSnippets);
-    elements.categoryFilter.addEventListener('change', filterSnippets);
+    // Mobile sidebar events
+    const menuBtn = $('menuBtn');
+    const sidebarClose = $('sidebarClose');
+    const sidebarOverlay = $('sidebarOverlay');
+
+    if (menuBtn) menuBtn.addEventListener('click', openSidebar);
+    if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
+
+    // Search & Filter
+    const searchInput = $('searchInput');
+    const categoryFilter = $('categoryFilter');
+    if (searchInput) searchInput.addEventListener('input', filterSnippets);
+    if (categoryFilter) categoryFilter.addEventListener('change', filterSnippets);
 
     // Action buttons
-    elements.openNewTabBtn.addEventListener('click', openInNewTab);
-    elements.exportBtn.addEventListener('click', exportSnippets);
-    elements.importBtn.addEventListener('click', () => elements.importFile.click());
-    elements.importFile.addEventListener('change', importSnippets);
-    elements.downloadBtn.addEventListener('click', downloadHTML);
-    elements.saveFolderBtn.addEventListener('click', saveToFolder);
-    elements.refreshPreview.addEventListener('click', updatePreview);
-    elements.mobilePreviewBtn.addEventListener('click', openInNewTab);
+    const openNewTabBtn = $('openNewTabBtn');
+    const mobilePreviewBtn = $('mobilePreviewBtn');
+    const exportBtn = $('exportBtn');
+    const importBtn = $('importBtn');
+    const importFile = $('importFile');
+    const downloadBtn = $('downloadBtn');
+    const saveFolderBtn = $('saveFolderBtn');
+    const refreshPreview = $('refreshPreview');
+
+    if (openNewTabBtn) openNewTabBtn.addEventListener('click', openInNewTab);
+    if (mobilePreviewBtn) mobilePreviewBtn.addEventListener('click', openInNewTab);
+    if (exportBtn) exportBtn.addEventListener('click', exportSnippets);
+    if (importBtn) importBtn.addEventListener('click', () => importFile && importFile.click());
+    if (importFile) importFile.addEventListener('change', importSnippets);
+    if (downloadBtn) downloadBtn.addEventListener('click', downloadHTML);
+    if (saveFolderBtn) saveFolderBtn.addEventListener('click', saveToFolder);
+    if (refreshPreview) refreshPreview.addEventListener('click', updatePreview);
 
     // Mobile view toggle
-    elements.mobileViewToggle.addEventListener('click', (e) => {
-        const btn = e.target.closest('.toggle-btn');
-        if (btn) {
-            setMobileView(btn.dataset.view);
-        }
-    });
+    const mobileViewToggle = $('mobileViewToggle');
+    if (mobileViewToggle) {
+        mobileViewToggle.addEventListener('click', (e) => {
+            const btn = e.target.closest('.toggle-btn');
+            if (btn && btn.dataset.view) {
+                setMobileView(btn.dataset.view);
+            }
+        });
+    }
 
     // Resizer
     setupResizer();
@@ -121,16 +108,17 @@ function setupEventListeners() {
     // Keyboard shortcuts
     document.addEventListener('keydown', handleGlobalKeydown);
 
-    // Handle visibility change - save when leaving
+    // Save when leaving page
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden && elements.editor.value.trim()) {
+        const editorEl = $('htmlEditor');
+        if (document.hidden && editorEl && editorEl.value.trim()) {
             autoSave();
         }
     });
 
-    // Save before unload
     window.addEventListener('beforeunload', () => {
-        if (elements.editor.value.trim()) {
+        const editorEl = $('htmlEditor');
+        if (editorEl && editorEl.value.trim()) {
             autoSave();
         }
     });
@@ -142,44 +130,59 @@ function setupEventListeners() {
 function setMobileView(view) {
     state.mobileView = view;
 
+    const mobileViewToggle = $('mobileViewToggle');
+    const editorPanel = $('editorPanel');
+    const previewPanel = $('previewPanel');
+
     // Update toggle buttons
-    elements.mobileViewToggle.querySelectorAll('.toggle-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.view === view);
-    });
+    if (mobileViewToggle) {
+        mobileViewToggle.querySelectorAll('.toggle-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.view === view);
+        });
+    }
 
     // Show/hide panels
-    if (view === 'editor') {
-        elements.editorPanel.classList.remove('hidden');
-        elements.previewPanel.classList.add('hidden');
-    } else if (view === 'preview') {
-        elements.editorPanel.classList.add('hidden');
-        elements.previewPanel.classList.remove('hidden');
-    } else {
-        elements.editorPanel.classList.remove('hidden');
-        elements.previewPanel.classList.remove('hidden');
+    if (editorPanel && previewPanel) {
+        if (view === 'editor') {
+            editorPanel.classList.remove('hidden');
+            previewPanel.classList.add('hidden');
+        } else if (view === 'preview') {
+            editorPanel.classList.add('hidden');
+            previewPanel.classList.remove('hidden');
+        } else {
+            editorPanel.classList.remove('hidden');
+            previewPanel.classList.remove('hidden');
+        }
     }
 }
 
 function openSidebar() {
-    elements.sidebar.classList.add('open');
-    elements.sidebarOverlay.classList.add('active');
+    const sidebar = $('sidebar');
+    const sidebarOverlay = $('sidebarOverlay');
+    if (sidebar) sidebar.classList.add('open');
+    if (sidebarOverlay) sidebarOverlay.classList.add('active');
 }
 
 function closeSidebar() {
-    elements.sidebar.classList.remove('open');
-    elements.sidebarOverlay.classList.remove('active');
+    const sidebar = $('sidebar');
+    const sidebarOverlay = $('sidebarOverlay');
+    if (sidebar) sidebar.classList.remove('open');
+    if (sidebarOverlay) sidebarOverlay.classList.remove('active');
 }
 
 // ========================================
 // Editor Functions
 // ========================================
 function handleEditorInput() {
+    const editor = $('htmlEditor');
+    if (!editor) return;
+
     updateLineNumbers();
     updatePreview();
     updateStats();
 
     // Extract title from HTML
-    const title = extractTitle(elements.editor.value);
+    const title = extractTitle(editor.value);
     updateTitle(title);
 
     // Auto-save with debounce
@@ -190,12 +193,15 @@ function handleEditorKeydown(e) {
     // Tab key handling
     if (e.key === 'Tab') {
         e.preventDefault();
-        const start = elements.editor.selectionStart;
-        const end = elements.editor.selectionEnd;
-        const value = elements.editor.value;
+        const editor = $('htmlEditor');
+        if (!editor) return;
 
-        elements.editor.value = value.substring(0, start) + '  ' + value.substring(end);
-        elements.editor.selectionStart = elements.editor.selectionEnd = start + 2;
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const value = editor.value;
+
+        editor.value = value.substring(0, start) + '  ' + value.substring(end);
+        editor.selectionStart = editor.selectionEnd = start + 2;
         handleEditorInput();
     }
 }
@@ -208,29 +214,43 @@ function handlePaste() {
 }
 
 function updateLineNumbers() {
-    const lines = elements.editor.value.split('\n').length;
+    const editor = $('htmlEditor');
+    const lineNumbers = $('lineNumbers');
+    if (!editor || !lineNumbers) return;
+
+    const lines = editor.value.split('\n').length;
     const lineNumbersHtml = Array.from({ length: lines }, (_, i) => `<span>${i + 1}</span>`).join('');
-    elements.lineNumbers.innerHTML = lineNumbersHtml;
+    lineNumbers.innerHTML = lineNumbersHtml;
 }
 
 function updateStats() {
-    const content = elements.editor.value;
+    const editor = $('htmlEditor');
+    const lineCount = $('lineCount');
+    const charCount = $('charCount');
+
+    if (!editor) return;
+
+    const content = editor.value;
     const lines = content.split('\n').length;
     const chars = content.length;
 
-    elements.lineCount.textContent = `${lines}`;
-    elements.charCount.textContent = `${chars.toLocaleString()}`;
+    if (lineCount) lineCount.textContent = `${lines} lines`;
+    if (charCount) charCount.textContent = `${chars.toLocaleString()} chars`;
 }
 
 function syncScroll() {
-    elements.lineNumbers.scrollTop = elements.editor.scrollTop;
+    const editor = $('htmlEditor');
+    const lineNumbers = $('lineNumbers');
+    if (editor && lineNumbers) {
+        lineNumbers.scrollTop = editor.scrollTop;
+    }
 }
 
 // ========================================
-// Title Extraction
+// Title Management
 // ========================================
 function extractTitle(html) {
-    if (!html || !html.trim()) return '';
+    if (!html || !html.trim()) return 'Untitled';
 
     // Try to find <title> tag
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
@@ -244,7 +264,7 @@ function extractTitle(html) {
         return h1Match[1].trim();
     }
 
-    // Try to find id or class that suggests a component
+    // Try to find id
     const idMatch = html.match(/id=["']([^"']+)["']/i);
     if (idMatch && idMatch[1].length < 30) {
         return toTitleCase(idMatch[1].replace(/[-_]/g, ' '));
@@ -267,8 +287,11 @@ function toTitleCase(str) {
 }
 
 function updateTitle(title) {
-    elements.currentTitle.value = title;
-    elements.mobileTitleText.textContent = title || 'HTML Visualizer';
+    const currentTitle = $('currentTitle');
+    const mobileTitleText = $('mobileTitleText');
+
+    if (currentTitle) currentTitle.textContent = title || 'Untitled';
+    if (mobileTitleText) mobileTitleText.textContent = title || 'HTML Visualizer';
     document.title = title ? `${title} - HTML Visualizer` : 'HTML Visualizer';
 }
 
@@ -276,34 +299,36 @@ function updateTitle(title) {
 // Auto-Save
 // ========================================
 function scheduleAutoSave() {
-    // Clear existing timeout
     if (state.autoSaveTimeout) {
         clearTimeout(state.autoSaveTimeout);
     }
 
-    // Show saving indicator
-    elements.statusIndicator.classList.add('saving');
-    elements.statusText.textContent = 'Saving...';
+    const statusIndicator = $('statusIndicator');
+    const statusText = document.querySelector('.status-text');
 
-    // Save after 1 second of inactivity
+    if (statusIndicator) statusIndicator.classList.add('saving');
+    if (statusText) statusText.textContent = 'Saving...';
+
     state.autoSaveTimeout = setTimeout(() => {
         autoSave();
     }, 1000);
 }
 
 function autoSave() {
-    const html = elements.editor.value.trim();
+    const editor = $('htmlEditor');
+    if (!editor) return;
+
+    const html = editor.value.trim();
     if (!html) return;
 
-    const title = elements.currentTitle.value || 'Untitled';
+    const currentTitle = $('currentTitle');
+    const title = (currentTitle ? currentTitle.textContent : '') || 'Untitled';
     const category = detectCategory(html);
 
-    // Check if this is an update to existing snippet or new
     let snippet;
     const now = new Date().toISOString();
 
     if (state.currentSnippetId) {
-        // Update existing
         const index = state.snippets.findIndex(s => s.id === state.currentSnippetId);
         if (index !== -1) {
             snippet = state.snippets[index];
@@ -315,7 +340,6 @@ function autoSave() {
     }
 
     if (!snippet) {
-        // Create new
         snippet = {
             id: generateId(),
             title,
@@ -331,9 +355,11 @@ function autoSave() {
     saveSnippetsToStorage();
     renderSnippetsList();
 
-    // Update status
-    elements.statusIndicator.classList.remove('saving');
-    elements.statusText.textContent = 'Saved';
+    const statusIndicator = $('statusIndicator');
+    const statusText = document.querySelector('.status-text');
+
+    if (statusIndicator) statusIndicator.classList.remove('saving');
+    if (statusText) statusText.textContent = 'Saved';
     setStatus('Auto-saved');
 }
 
@@ -363,7 +389,11 @@ function detectCategory(html) {
 // Preview Functions
 // ========================================
 function updatePreview() {
-    const html = elements.editor.value;
+    const editor = $('htmlEditor');
+    const previewFrame = $('previewFrame');
+    if (!editor || !previewFrame) return;
+
+    const html = editor.value;
 
     const previewHTML = `<!DOCTYPE html>
 <html>
@@ -378,17 +408,21 @@ function updatePreview() {
     const blob = new Blob([previewHTML], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
 
-    if (elements.previewFrame.dataset.blobUrl) {
-        URL.revokeObjectURL(elements.previewFrame.dataset.blobUrl);
+    if (previewFrame.dataset.blobUrl) {
+        URL.revokeObjectURL(previewFrame.dataset.blobUrl);
     }
 
-    elements.previewFrame.src = url;
-    elements.previewFrame.dataset.blobUrl = url;
+    previewFrame.src = url;
+    previewFrame.dataset.blobUrl = url;
 }
 
 function openInNewTab() {
-    const html = elements.editor.value;
-    const title = elements.currentTitle.value || 'Preview';
+    const editor = $('htmlEditor');
+    const currentTitle = $('currentTitle');
+    if (!editor) return;
+
+    const html = editor.value;
+    const title = (currentTitle ? currentTitle.textContent : '') || 'Preview';
 
     const fullHTML = `<!DOCTYPE html>
 <html>
@@ -438,8 +472,15 @@ function generateId() {
 // Render Snippets List
 // ========================================
 function renderSnippetsList() {
-    const searchTerm = elements.searchInput.value.toLowerCase();
-    const categoryFilter = elements.categoryFilter.value;
+    const searchInput = $('searchInput');
+    const categoryFilter = $('categoryFilter');
+    const snippetsList = $('snippetsList');
+    const snippetsCount = $('snippetsCount');
+
+    if (!snippetsList) return;
+
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+    const categoryFilterValue = categoryFilter ? categoryFilter.value : '';
 
     let filtered = state.snippets;
 
@@ -450,27 +491,33 @@ function renderSnippetsList() {
         );
     }
 
-    if (categoryFilter) {
-        filtered = filtered.filter(s => s.category === categoryFilter);
+    if (categoryFilterValue) {
+        filtered = filtered.filter(s => s.category === categoryFilterValue);
     }
 
-    elements.snippetsCount.textContent = `${filtered.length} snippet${filtered.length !== 1 ? 's' : ''}`;
+    if (snippetsCount) {
+        snippetsCount.textContent = `${filtered.length} snippet${filtered.length !== 1 ? 's' : ''}`;
+    }
 
     if (filtered.length === 0) {
-        elements.snippetsList.innerHTML = `
+        snippetsList.innerHTML = `
             <div class="empty-state">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                </svg>
-                <p>${searchTerm || categoryFilter ? 'No matches' : 'No snippets yet'}</p>
-                <span>${searchTerm || categoryFilter ? 'Try different search' : 'Paste HTML to auto-save'}</span>
+                <div class="empty-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <path d="M12 18v-6"/>
+                        <path d="M9 15l3-3 3 3"/>
+                    </svg>
+                </div>
+                <h3>${searchTerm || categoryFilterValue ? 'No matches found' : 'No snippets yet'}</h3>
+                <p>${searchTerm || categoryFilterValue ? 'Try a different search' : 'Paste HTML code to get started'}</p>
             </div>
         `;
         return;
     }
 
-    elements.snippetsList.innerHTML = filtered.map(snippet => `
+    snippetsList.innerHTML = filtered.map(snippet => `
         <div class="snippet-card ${snippet.id === state.currentSnippetId ? 'active' : ''}" data-id="${snippet.id}">
             <div class="snippet-card-actions">
                 <button class="btn-icon btn-delete" title="Delete" data-action="delete" data-id="${snippet.id}">
@@ -488,9 +535,11 @@ function renderSnippetsList() {
         </div>
     `).join('');
 
-    elements.snippetsList.querySelectorAll('.snippet-card').forEach(card => {
+    // Add click listeners
+    snippetsList.querySelectorAll('.snippet-card').forEach(card => {
         card.addEventListener('click', (e) => {
             if (e.target.closest('[data-action="delete"]')) {
+                e.stopPropagation();
                 deleteSnippet(e.target.closest('[data-action="delete"]').dataset.id);
             } else {
                 loadSnippet(card.dataset.id);
@@ -506,8 +555,11 @@ function loadSnippet(id) {
     const snippet = state.snippets.find(s => s.id === id);
     if (!snippet) return;
 
+    const editor = $('htmlEditor');
+    if (!editor) return;
+
     state.currentSnippetId = id;
-    elements.editor.value = snippet.html;
+    editor.value = snippet.html;
 
     updateTitle(snippet.title);
     updateLineNumbers();
@@ -524,8 +576,9 @@ function deleteSnippet(id) {
 
     if (state.currentSnippetId === id) {
         state.currentSnippetId = null;
-        elements.editor.value = '';
-        updateTitle('');
+        const editor = $('htmlEditor');
+        if (editor) editor.value = '';
+        updateTitle('Untitled');
         updateLineNumbers();
         updatePreview();
     }
@@ -601,8 +654,13 @@ function importSnippets(e) {
 // File System Access API
 // ========================================
 async function saveToFolder() {
-    const html = elements.editor.value;
-    const title = elements.currentTitle.value || 'snippet';
+    const editor = $('htmlEditor');
+    const currentTitle = $('currentTitle');
+
+    if (!editor) return;
+
+    const html = editor.value;
+    const title = (currentTitle ? currentTitle.textContent : '') || 'snippet';
 
     if (!('showSaveFilePicker' in window)) {
         downloadHTML();
@@ -649,8 +707,13 @@ ${html}
 }
 
 function downloadHTML() {
-    const html = elements.editor.value;
-    const title = elements.currentTitle.value || 'snippet';
+    const editor = $('htmlEditor');
+    const currentTitle = $('currentTitle');
+
+    if (!editor) return;
+
+    const html = editor.value;
+    const title = (currentTitle ? currentTitle.textContent : '') || 'snippet';
     const filename = title.toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '') + '.html';
@@ -680,16 +743,21 @@ ${html}
 }
 
 // ========================================
-// Utility Functions
+// Resizer
 // ========================================
 function setupResizer() {
-    let isResizing = false;
-    const editorPanel = elements.editorPanel;
-    const previewPanel = elements.previewPanel;
+    const resizer = $('resizer');
+    const editorPanel = $('editorPanel');
+    const previewPanel = $('previewPanel');
+    const editorContainer = $('editorContainer');
 
-    elements.resizer.addEventListener('mousedown', (e) => {
+    if (!resizer || !editorPanel || !previewPanel || !editorContainer) return;
+
+    let isResizing = false;
+
+    resizer.addEventListener('mousedown', () => {
         isResizing = true;
-        elements.resizer.classList.add('resizing');
+        resizer.classList.add('resizing');
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
     });
@@ -697,7 +765,7 @@ function setupResizer() {
     document.addEventListener('mousemove', (e) => {
         if (!isResizing) return;
 
-        const containerRect = elements.editorContainer.getBoundingClientRect();
+        const containerRect = editorContainer.getBoundingClientRect();
         const percentage = ((e.clientX - containerRect.left) / containerRect.width) * 100;
         const clampedPercentage = Math.max(20, Math.min(80, percentage));
 
@@ -708,32 +776,47 @@ function setupResizer() {
     document.addEventListener('mouseup', () => {
         if (isResizing) {
             isResizing = false;
-            elements.resizer.classList.remove('resizing');
+            resizer.classList.remove('resizing');
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
         }
     });
 }
 
+// ========================================
+// Keyboard Shortcuts
+// ========================================
 function handleGlobalKeydown(e) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
         e.preventDefault();
         if (window.innerWidth <= 768) {
-            elements.sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+            const sidebar = $('sidebar');
+            if (sidebar) {
+                sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+            }
         }
     }
 }
 
+// ========================================
+// Utility Functions
+// ========================================
 function setStatus(text) {
-    elements.statusText.textContent = text;
+    const statusText = document.querySelector('.status-text');
+    if (!statusText) return;
+
+    statusText.textContent = text;
     setTimeout(() => {
-        if (elements.statusText.textContent === text) {
-            elements.statusText.textContent = 'Ready';
+        if (statusText.textContent === text) {
+            statusText.textContent = 'Ready';
         }
     }, 2000);
 }
 
 function showToast(message, type = 'info') {
+    const toastContainer = $('toastContainer');
+    if (!toastContainer) return;
+
     const icons = {
         success: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
         error: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
@@ -745,13 +828,13 @@ function showToast(message, type = 'info') {
     toast.className = `toast ${type}`;
     toast.innerHTML = `${icons[type] || icons.info}<span>${escapeHtml(message)}</span>`;
 
-    elements.toastContainer.appendChild(toast);
+    toastContainer.appendChild(toast);
 
     setTimeout(() => {
         toast.style.opacity = '0';
         toast.style.transform = 'translateX(100%)';
         setTimeout(() => toast.remove(), 300);
-    }, 2000);
+    }, 2500);
 }
 
 function escapeHtml(text) {
